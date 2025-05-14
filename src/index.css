@@ -1,0 +1,26 @@
+/* Ensure Tailwind CSS is properly installed and configured */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+/* Define CSS variables for light mode */
+:root {
+  --background: #ffffff;
+  --background-dark: #1a1a1a;
+  --text: #111827;
+  --text-dark: #f3f4f6;
+}
+
+/* Define CSS variables for dark mode */
+.dark {
+  --background: #1a1a1a;
+  --background-dark: #ffffff;
+  --text: #f3f4f6;
+  --text-dark: #111827;
+}
+
+/* Add compatibility for text-size-adjust */
+html, :host {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
