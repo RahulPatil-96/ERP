@@ -1,290 +1,204 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Mail, Edit2, Eye, Trash2, X } from 'lucide-react';
+import { 
+  UsersIcon, 
+  BookOpenIcon,
+  AwardIcon,
+  GraduationCapIcon,
+  CalendarIcon,
+  PlusIcon,
+  SearchIcon
+} from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { Card } from '../../components/common/Card';
+import { Button } from '../../components/common/Button';
+import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
+import StudentForm from '../../components/common/StudentForm';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/common/Tabs';
+import { format } from 'date-fns';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/common/Table';
+import { useToast } from '../../hooks/useToast';
+import { Skeleton } from '../../components/common/Skeleton';
+
+interface AttendanceRecord {
+  date: string;
+  status: 'Present' | 'Absent' | 'Leave';
+}
+
 interface Student {
   id: number;
   name: string;
+  academicId: string;
   email: string;
-  phone?: string;
-  enrollmentDate?: string;
-  departmentId?: number | null;
-  status: 'Enrolled' | 'Graduated' | 'Dropped Out';
-  image: string | null;
-  courses: string[];
-  grades: string[];
+  phone: string;
+  batch: string;
+  semester: number;
+  gpa: number;
+  backlogs: number;
+  attendance: AttendanceRecord[];
+  classAdvisor: string | null;
+  redFlags: string[];
 }
 
-const statusStyles = {
-  Enrolled: 'bg-green-100 text-green-800',
-  Graduated: 'bg-blue-100 text-blue-800',
-  'Dropped Out': 'bg-red-100 text-red-800'
-};
-
-const getInitials = (name: string) => {
-  return name.split(' ').map(part => part[0]).join('').toUpperCase();
-};
-
-const StudentRow = ({ student, onView, onEdit, onDelete }: {
-  student: Student;
-  onView: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) => (
-  <div className="grid grid-cols-12 items-center p-4 hover:bg-gray-50 rounded-lg transition-colors gap-4">
-    <div className="col-span-4 flex items-center space-x-4">
-      <div className="flex-shrink-0">
-        {student.image ? (
-          <img className="w-12 h-12 rounded-full object-cover" src={student.image} alt={student.name} />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
-            {getInitials(student.name)}
-          </div>
-        )}
-      </div>
-      <div>
-        <div className="font-medium text-gray-900">{student.name}</div>
-        <div className="text-sm text-gray-500">{student.email}</div>
-      </div>
-    </div>
-    <div className="col-span-2">
-      <span className={`px-3 py-1 rounded-full text-sm ${statusStyles[student.status]}`}>
-        {student.status}
-      </span>
-    </div>
-    <div className="col-span-6 flex justify-end space-x-2">
-      <button onClick={onView} aria-label="View profile" title="View Profile" className="text-indigo-500 hover:text-indigo-600">
-        <Eye className="w-5 h-5" />
-      </button>
-      <button onClick={onEdit} aria-label="Edit student" title="Edit Student" className="text-indigo-500 hover:text-indigo-600">
-        <Edit2 className="w-5 h-5" />
-      </button>
-      <button onClick={onDelete} aria-label="Delete student" title="Delete Student" className="text-red-500 hover:text-red-600">
-        <Trash2 className="w-5 h-5" />
-      </button>
-    </div>
-  </div>
-);
-
-const DeleteConfirmationModal = ({ student, onDeleteConfirm, onCancel }: {
-  student: Student | null;
-  onDeleteConfirm: () => void;
-  onCancel: () => void;
-}) => (
-  student ? (
-    <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-full">
-        <h2 className="text-lg font-semibold text-gray-900">Confirm Deletion</h2>
-        <p className="mt-2 text-gray-600">Are you sure you want to delete {student.name}?</p>
-        <div className="mt-4 flex justify-end space-x-2">
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">Cancel</button>
-          <button onClick={onDeleteConfirm} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Delete</button>
-        </div>
-      </div>
-    </div>
-  ) : null
-);
-
-const NotificationModal = ({ onClose }: { onClose: () => void }) => (
-  <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-full">
-      <h2 className="text-lg font-semibold text-gray-900">Send Notification</h2>
-      <textarea className="mt-2 w-full p-2 border border-gray-300 rounded-md" rows={4} placeholder="Type your message here..."></textarea>
-      <div className="mt-4 flex justify-end space-x-2">
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">Cancel</button>
-        <button className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Send</button>
-      </div>
-    </div>
-  </div>
-);
-
-const EditModal = ({ student, onSave, onCancel }: {
-  student: Student | null;
-  onSave: (updatedStudent: Student) => void;
-  onCancel: () => void;
-}) => {
-  const [name, setName] = useState(student?.name || '');
-  const [email, setEmail] = useState(student?.email || '');
-  const [phone, setPhone] = useState(student?.phone || '');
-  const [status, setStatus] = useState(student?.status || 'Enrolled');
-  const [courses, setCourses] = useState((student?.courses ?? []).join(', '));
-  const [grades, setGrades] = useState((student?.grades ?? []).join(', '));
-
-  const handleSave = () => {
-    if (student) {
-      onSave({ ...student, name, email, phone, status, courses: courses.split(',').map(c => c.trim()), grades: grades.split(',').map(g => g.trim()) });
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-w-full">
-        <h2 className="text-lg font-semibold text-gray-900">Edit Student</h2>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="mt-2 w-full p-2 border border-gray-300 rounded-md" />
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="mt-2 w-full p-2 border border-gray-300 rounded-md" />
-        <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="mt-2 w-full p-2 border border-gray-300 rounded-md" />
-        <select value={status} onChange={(e) => setStatus(e.target.value as 'Enrolled' | 'Graduated' | 'Dropped Out')} className="mt-2 w-full p-2 border border-gray-300 rounded-md">
-          <option value="Enrolled">Enrolled</option>
-          <option value="Graduated">Graduated</option>
-          <option value="Dropped Out">Dropped Out</option>
-        </select>
-        <textarea value={courses} onChange={(e) => setCourses(e.target.value)} placeholder="Courses (comma separated)" className="mt-2 w-full p-2 border border-gray-300 rounded-md"></textarea>
-        <textarea value={grades} onChange={(e) => setGrades(e.target.value)} placeholder="Grades (comma separated)" className="mt-2 w-full p-2 border border-gray-300 rounded-md"></textarea>
-        <div className="mt-4 flex justify-end space-x-2">
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">Cancel</button>
-          <button onClick={handleSave} className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Save</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export function Students() {
-  const [students, setStudents] = React.useState<Student[]>([]);
+  const { toast } = useToast();
+  const [studentList, setStudentList] = useState<Student[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('directory');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  const [searchQuery, setSearchQuery] = React.useState<string>('');
-  const [filterStatus, setFilterStatus] = React.useState<string>('All');
-  const [selectedStudent, setSelectedStudent] = React.useState<Student | null>(null);
-  const [studentToDelete, setStudentToDelete] = React.useState<Student | null>(null);
-  const [showNotificationModal, setShowNotificationModal] = React.useState(false);
-  const [editingStudent, setEditingStudent] = React.useState<Student | null>(null);
-  const [uploading, setUploading] = React.useState(false);
-
-  React.useEffect(() => {
+  useEffect(() => {
     fetchStudents();
   }, []);
 
   const fetchStudents = async () => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/students');
       if (!response.ok) {
-        throw new Error(`Error fetching students: ${response.statusText}`);
+        throw new Error('Failed to fetch students');
       }
       const data = await response.json();
-      setStudents(data);
+      setStudentList(data);
     } catch (error) {
-      console.error('Error fetching students:', error);
+      toast({ title: 'Failed to load students', variant: 'destructive' });
+      console.error(error);
     }
+    setIsLoading(false);
   };
-
-  const handleDeleteStudent = async (id: number) => {
-    try {
-      const response = await fetch(`/api/students/${id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        throw new Error(`Error deleting student: ${response.statusText}`);
-      }
-      setStudents(students.filter((student) => student.id !== id));
-      setStudentToDelete(null);
-    } catch (error) {
-      console.error('Error deleting student:', error);
-    }
-  };
-
-  const handleEditStudent = async (updatedStudent: Student) => {
-    try {
-      const response = await fetch(`/api/students/${updatedStudent.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedStudent),
-      });
-      if (!response.ok) {
-        throw new Error(`Error updating student: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setStudents(students.map(student => student.id === data.id ? data : student));
-      setEditingStudent(null);
-    } catch (error) {
-      console.error('Error updating student:', error);
-    }
-  };
-
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-    const newStudents: Partial<Student>[] = [];
-
-    for (const item of jsonData) {
-      const student: Partial<Student> = {
-        name: item['Name'] || '',
-        email: item['Email'] || '',
-        phone: item['Phone'] || '',
-        enrollmentDate: item['EnrollmentDate'] || '',
-        departmentId: item['DepartmentId'] || null,
-      };
-      newStudents.push(student);
-    }
-
     try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      const newStudents: Student[] = [];
+
+      for (const item of jsonData) {
+        const student: Student = {
+          id: studentList.length + newStudents.length + 1,
+          name: item['Name'] || '',
+          academicId: item['AcademicId'] || '',
+          email: item['Email'] || '',
+          phone: item['Phone'] || '',
+          batch: item['Batch'] || '',
+          semester: item['Semester'] || 0,
+          gpa: item['GPA'] || 0,
+          backlogs: item['Backlogs'] || 0,
+          attendance: [], // Could be extended to parse attendance if needed
+          classAdvisor: item['ClassAdvisor'] || '',
+          redFlags: item['RedFlags'] ? item['RedFlags'].split(',').map((r: string) => r.trim()) : [],
+        };
+        newStudents.push(student);
+      }
+
       const response = await fetch('/api/students/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newStudents),
       });
-      if (!response.ok) {
-        throw new Error(`Error uploading students: ${response.statusText}`);
-      }
-      const createdStudents = await response.json();
-      setStudents(createdStudents);
-    } catch (error) {
-      console.error('Error uploading students:', error);
-    }
 
+      if (!response.ok) {
+        throw new Error('Failed to upload student data');
+      }
+
+      const createdStudents = await response.json();
+      setStudentList(prev => [...prev, ...createdStudents]);
+      toast({ title: 'Student data uploaded successfully', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Failed to upload student data', variant: 'destructive' });
+      console.error('Error uploading student data:', error);
+    }
     setUploading(false);
   };
 
-  const filteredStudents = students.filter(
-    (student: Student) =>
-      (filterStatus === 'All' || student.status === filterStatus) &&
-      (student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+const filteredStudents = useMemo(() => {
+    return studentList.filter(student => 
+      student?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student?.academicId?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [studentList, searchQuery]);
 
-  const handleViewProfile = (student: Student) => {
-    setSelectedStudent(student);
+  const handleAddStudent = async (newStudent: Omit<Student, 'id'>) => {
+    try {
+      const response = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudent),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add student');
+      }
+      const createdStudent = await response.json();
+      setStudentList(prev => [...prev, createdStudent]);
+      setIsEditModalOpen(false);
+      toast({ title: 'Student added successfully', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Failed to add student', variant: 'destructive' });
+      console.error(error);
+    }
   };
 
-  const handleCloseProfile = () => {
-    setSelectedStudent(null);
+  const handleUpdateStudent = async (updatedStudent: Student | Omit<Student, 'id'>) => {
+    if ('id' in updatedStudent) {
+      try {
+        const response = await fetch(`/api/students/${updatedStudent.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedStudent),
+        });
+        if (!response.ok) {
+          throw new Error('Failed to update student');
+        }
+        const data = await response.json();
+        setStudentList(prev => prev.map(s => s.id === data.id ? data : s));
+        setIsEditModalOpen(false);
+        toast({ title: 'Student updated successfully', variant: 'success' });
+      } catch (error) {
+        toast({ title: 'Failed to update student', variant: 'destructive' });
+        console.error(error);
+      }
+    } else {
+      await handleAddStudent(updatedStudent);
+    }
   };
 
   return (
-    <>
-    <div className="space-y-8">
+    <div className="space-y-8 p-6">
       <PageHeader
         title="Students"
-        subtitle="Manage students, view profiles, and send notifications"
-        icon={Search}
+        subtitle="Comprehensive student administration system"
+        icon={UsersIcon}
       />
-      <div className="w-full max-w-screen-xl bg-white shadow-lg rounded-xl p-8">
-        <div className="mb-6 flex flex-col md:flex-row justify-between items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Search className="w-5 h-5 text-gray-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or email..."
-              className="w-full md:w-2/3 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="mt-2 md:mt-0 p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="All">All Students</option>
-            <option value="Enrolled">Enrolled</option>
-            <option value="Graduated">Graduated</option>
-            <option value="Dropped Out">Dropped Out</option>
-          </select>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-xl">
+          <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search students..."
+            className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-primary"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button onClick={() => setIsEditModalOpen(true)} className="gap-2">
+            <PlusIcon className="w-4 h-4" />
+            Add Student
+          </Button>
           <input
             type="file"
             accept=".xlsx, .xls"
@@ -292,101 +206,298 @@ export function Students() {
             disabled={uploading}
             className="ml-4 p-2 border border-gray-300 rounded-md cursor-pointer"
           />
-          {/* Removed Open Student Data Form button as per user request */}
         </div>
       </div>
-    </div>
 
-    <div className="space-y-4">
-      {filteredStudents.length === 0 ? (
-        <div className="text-center text-gray-500">No students found.</div>
-      ) : (
-        filteredStudents.map((student: Student) => (
-          <StudentRow
-            key={student.id}
-            student={student}
-            onView={() => handleViewProfile(student)}
-            onEdit={() => setEditingStudent(student)}
-            onDelete={() => setStudentToDelete(student)}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3">
+          <TabsTrigger value="directory" className="gap-2">
+            <UsersIcon className="w-4 h-4" />
+            Directory
+          </TabsTrigger>
+          <TabsTrigger value="academic-progress" className="gap-2">
+            <BookOpenIcon className="w-4 h-4" />
+            Academic Progress
+          </TabsTrigger>
+          <TabsTrigger value="attendance" className="gap-2">
+            <CalendarIcon className="w-4 h-4" />
+            Attendance
+          </TabsTrigger>
+          <TabsTrigger value="red-flags" className="gap-2">
+            <AwardIcon className="w-4 h-4" />
+            Red Flags
+          </TabsTrigger>
+          <TabsTrigger value="class-advisors" className="gap-2">
+            <GraduationCapIcon className="w-4 h-4" />
+            Class Advisors
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="directory">
+          <Card className="p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <div className="w-[30%]">Student Name</div>
+                  </TableHead>
+                  <TableHead>Academic ID</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array(5).fill(0).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-[100px] ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : (filteredStudents ?? []).length > 0 ? (
+                  (filteredStudents ?? []).map((student) => (
+                    <TableRow key={student.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="font-medium">{student.name}</div>
+                      </TableCell>
+                      <TableCell>{student.academicId}</TableCell>
+                      <TableCell>{student.email}</TableCell>
+                      <TableCell>{student.phone}</TableCell>
+                      <TableCell>{student.batch}</TableCell>
+                      <TableCell>
+                        <Button 
+                          size="sm" 
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setIsViewModalOpen(true);
+                          }}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <td colSpan={6} className="h-24 text-center text-muted-foreground">
+                      No students found
+                    </td>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="academic-progress">
+          <Card className="p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <div className="w-[30%]">Student Name</div>
+                  </TableHead>
+                  <TableHead>GPA</TableHead>
+                  <TableHead>Backlogs</TableHead>
+                  <TableHead>Semester</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(filteredStudents ?? []).map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div className="font-medium">{student.name}</div>
+                    </TableCell>
+                    <TableCell>{student.gpa}</TableCell>
+                    <TableCell>{student.backlogs}</TableCell>
+                    <TableCell>{student.semester}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Attendance Records</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+{(filteredStudents ?? []).filter(Boolean).reduce<React.ReactNode[]>((acc, student) => {
+  const attendanceArray = Array.isArray(student?.attendance) ? student.attendance : [];
+  const attendanceRows = attendanceArray.map((record: AttendanceRecord, index: number) => (
+    <TableRow key={`${student.id}-${index}`}>
+      <TableCell>{student.name}</TableCell>
+      <TableCell>{format(new Date(record.date), 'MMMM dd, yyyy')}</TableCell>
+      <TableCell>
+        <Badge variant={record.status === 'Present' ? 'success' : 'destructive'}>
+          {record.status}
+        </Badge>
+      </TableCell>
+    </TableRow>
+  ));
+  return acc.concat(attendanceRows);
+}, [])}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="red-flags">
+          <Card className="p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <div className="w-[30%]">Student Name</div>
+                  </TableHead>
+                  <TableHead>Red Flags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(filteredStudents ?? []).map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div className="font-medium">{student.name}</div>
+                    </TableCell>
+                    <TableCell>
+                      {(student.redFlags ?? []).length > 0 ? (
+                        (student.redFlags ?? []).map((flag: string, index: number) => (
+                          <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
+                        ))
+                      ) : (
+                        <span>No red flags</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="class-advisors">
+          <Card className="p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <div className="w-[30%]">Student Name</div>
+                  </TableHead>
+                  <TableHead>Class Advisor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(filteredStudents ?? []).map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div className="font-medium">{student.name}</div>
+                    </TableCell>
+                    <TableCell>{student.classAdvisor || 'No advisor assigned'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {isViewModalOpen && selectedStudent && (
+        <Modal 
+          isOpen={isViewModalOpen}
+          title={`${selectedStudent.name} Details`}
+          onClose={() => setIsViewModalOpen(false)}
+        >
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">{selectedStudent.name} Details</h3>
+              <button 
+                onClick={() => setIsViewModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Basic Information</h4>
+                  <div className="space-y-2">
+                    <p><strong>Academic ID:</strong> {selectedStudent.academicId}</p>
+                    <p><strong>Email:</strong> {selectedStudent.email}</p>
+                    <p><strong>Phone:</strong> {selectedStudent.phone}</p>
+                    <p><strong>Batch:</strong> {selectedStudent.batch}</p>
+                    <p><strong>Semester:</strong> {selectedStudent.semester}</p>
+                    <p><strong>GPA:</strong> {selectedStudent.gpa}</p>
+                    <p><strong>Backlogs:</strong> {selectedStudent.backlogs}</p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Attendance Records</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+{(selectedStudent.attendance ?? []).map((record: AttendanceRecord, index: number) => (
+                        <TableRow key={index}>
+                          <TableCell>{format(new Date(record.date), 'MMMM dd, yyyy')}</TableCell>
+                          <TableCell>
+                            <Badge variant={record.status === 'Present' ? 'success' : 'destructive'}>
+                              {record.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Red Flags</h4>
+{(selectedStudent.redFlags ?? []).length > 0 ? (
+                  (selectedStudent.redFlags ?? []).map((flag: string, index: number) => (
+                    <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
+                  ))
+                ) : (
+                  <span>No red flags</span>
+                )}
+              </div>
+            </div>
+          </Card>
+        </Modal>
+      )}
+
+      {isEditModalOpen && (
+        <Modal 
+          isOpen={isEditModalOpen}
+          title={selectedStudent ? 'Edit Student' : 'Add Student'}
+          onClose={() => setIsEditModalOpen(false)}
+        >
+          <StudentForm 
+            student={selectedStudent} 
+            onSubmit={selectedStudent ? handleUpdateStudent : handleAddStudent} 
+            onClose={() => setIsEditModalOpen(false)} 
           />
-        ))
+        </Modal>
       )}
     </div>
-
-    <div className="mt-6 text-right">
-      <button onClick={() => setShowNotificationModal(true)} className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition duration-200">
-        <Mail className="w-5 h-5 inline-block mr-2" />
-        Send Notification
-      </button>
-    </div>
-
-    {/* Modals */}
-    {selectedStudent && <StudentProfileModal student={selectedStudent!} onClose={handleCloseProfile} />}
-    {editingStudent && (
-      <EditModal
-        student={editingStudent!}
-        onSave={handleEditStudent}
-        onCancel={() => setEditingStudent(null)}
-      />
-    )}
-    {showNotificationModal && <NotificationModal onClose={() => setShowNotificationModal(false)} />}
-    {studentToDelete && (
-      <DeleteConfirmationModal
-        student={studentToDelete!}
-        onDeleteConfirm={() => handleDeleteStudent(studentToDelete!.id)}
-        onCancel={() => setStudentToDelete(null)}
-      />
-    )}
-    </>
   );
 }
-
-const StudentProfileModal = ({ student, onClose }: { student: Student; onClose: () => void }) => (
-  <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-    <div className="bg-white p-8 rounded-lg w-96 shadow-lg">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-900">Student Profile</h2>
-        <button onClick={onClose} className="text-red-500 hover:text-red-700">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <div className="mt-4">
-        <div className="flex items-center space-x-4">
-          <div className="w-20 h-20 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold overflow-hidden">
-            {student.image ? (
-              <img className="w-full h-full object-cover" src={student.image} alt={student.name} />
-            ) : (
-              getInitials(student.name)
-            )}
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">{student.email}</div>
-            <div className="text-sm text-gray-600">{student.phone}</div>
-            <div className="text-sm text-gray-600">{student.enrollmentDate}</div>
-            <span className={`px-3 py-1 rounded-full text-sm ${statusStyles[student.status]}`}>
-              {student.status}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-900">Courses:</h3>
-          <ul className="list-disc pl-6">
-            {(student.courses || []).map((course, index) => (
-              <li key={index} className="text-gray-700">{course}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-900">Grades:</h3>
-          <ul className="list-disc pl-6">
-            {(student.grades || []).map((grade, index) => (
-              <li key={index} className="text-gray-700">{grade}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-);
