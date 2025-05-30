@@ -146,7 +146,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  impersonateUser: async (userId: string) => {
+  impersonateUser: async () => {
     set({ loading: true, error: null });
     // Placeholder for impersonation implementation
     set({ error: 'Impersonation not implemented yet', loading: false });
