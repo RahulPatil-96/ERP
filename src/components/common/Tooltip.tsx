@@ -1,13 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
 interface TooltipProps {
-  text: string;
+  content: string;
   position?: 'top' | 'right' | 'bottom' | 'left';
   delay?: number;
+  children: ReactNode;
 }
 
-export const Tooltip = ({ text, position = 'top', delay = 300 }: TooltipProps) => {
+export const Tooltip = ({ content, position = 'top', delay = 300, children }: TooltipProps) => {
   const [isVisible, setIsVisible] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -46,7 +47,7 @@ export const Tooltip = ({ text, position = 'top', delay = 300 }: TooltipProps) =
       onMouseLeave={handleMouseLeave}
     >
       {/* Target Element */}
-      <div className="cursor-pointer">{/* Content to hover over */}</div>
+      <div className="cursor-pointer">{children}</div>
 
       {/* Tooltip */}
       {isVisible && (
@@ -58,7 +59,7 @@ export const Tooltip = ({ text, position = 'top', delay = 300 }: TooltipProps) =
           exit={{ opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300 }}
         >
-          {text}
+          {content}
         </motion.div>
       )}
     </div>
