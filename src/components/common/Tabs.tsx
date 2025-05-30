@@ -13,10 +13,10 @@ export const Tabs = ({ value, onValueChange, children, className }: TabsProps) =
     <div className={cn('flex flex-col', className)}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          if (child.type === TabsList) {
-            return React.cloneElement(child, { value, onValueChange });
+          if ((child.type as any).displayName === 'TabsList') {
+            return React.cloneElement(child, { value, onValueChange } as any);
           }
-          if (child.type === TabsContent) {
+          if ((child.type as any).displayName === 'TabsContent') {
             return child.props.value === value ? child : null;
           }
         }
@@ -33,21 +33,22 @@ interface TabsListProps {
   className?: string;
 }
 
-export const TabsList = ({ children, value, onValueChange, className }: TabsListProps) => {
+const TabsList = ({ children, value, onValueChange, className }: TabsListProps) => {
   return (
     <div className={cn('flex border-b border-gray-200', className)}>
       {React.Children.map(children, (child) => {
-        if (React.isValidElement(child) && child.type === TabsTrigger) {
+        if (React.isValidElement(child) && (child.type as any).displayName === 'TabsTrigger') {
           return React.cloneElement(child, { 
             active: value === child.props.value,
             onValueChange 
-          });
+          } as any);
         }
         return child;
       })}
     </div>
   );
 };
+TabsList.displayName = 'TabsList';
 
 interface TabsTriggerProps {
   value: string;
@@ -57,7 +58,7 @@ interface TabsTriggerProps {
   className?: string;
 }
 
-export const TabsTrigger = ({ 
+const TabsTrigger = ({ 
   value, 
   active, 
   onValueChange, 
@@ -79,6 +80,7 @@ export const TabsTrigger = ({
     </button>
   );
 };
+TabsTrigger.displayName = 'TabsTrigger';
 
 interface TabsContentProps {
   value: string;
@@ -86,10 +88,13 @@ interface TabsContentProps {
   className?: string;
 }
 
-export const TabsContent = ({ value, children, className }: TabsContentProps) => {
+const TabsContent = ({ value, children, className }: TabsContentProps) => {
   return (
     <div className={cn('p-4', className)}>
       {children}
     </div>
   );
 };
+TabsContent.displayName = 'TabsContent';
+
+export { TabsList, TabsTrigger, TabsContent };
