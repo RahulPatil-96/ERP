@@ -134,7 +134,7 @@ const initialAssignments: FacultyAssignment[] = [
     type: 'essay',
     dueDate: '2024-06-05T23:59',
     status: 'draft',
-    instructions: 'Write a 1000-word analysis and review a peer's essay',
+    instructions: 'Write a 1000-word analysis and review a peer\'s essay',
     points: 90,
     wordLimit: 1000,
     attachments: [],
