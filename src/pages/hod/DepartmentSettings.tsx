@@ -4,7 +4,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 
 export function DepartmentSettings() {
   const [departmentInfo, setDepartmentInfo] = useState({

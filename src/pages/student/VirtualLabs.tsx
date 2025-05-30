@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { Progress } from '../../components/common/Progress';
 import { Tooltip } from '../../components/common/Tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
