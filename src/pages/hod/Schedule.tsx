@@ -16,7 +16,7 @@ import { enIN } from 'date-fns/locale';
 import { CalendarIcon, PlusCircle, Upload, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
