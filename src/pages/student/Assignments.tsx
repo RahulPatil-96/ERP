@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FileText, Upload, Clock, CheckCircle, XCircle, Download, AlertTriangle, Code2, Flag } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AssignmentCard } from '../../components/common/AssignmentCard';
 
@@ -314,7 +314,7 @@ const EnhancedMCQTest = ({ test }: { test: MCQTest }) => {
                 className="mr-3"
                 disabled={isSubmitted}
               />
-              <span className={`${isSubmitted && option === test.questions[currentQuestion].correctAnswer ? 'text-green-600 font-bold' : ''} ${isSubmitted && selectedAnswers[currentQuestion] === option && option !== test. questions[currentQuestion].correctAnswer ? 'text-red-600 line-through' : ''}`}>
+              <span className={`${isSubmitted && option === test.questions[currentQuestion].correctAnswer ? 'text-green-600 font-bold' : ''} ${isSubmitted && selectedAnswers[currentQuestion] === option && option !== test.questions[currentQuestion].correctAnswer ? 'text-red-600 line-through' : ''}`}>
                 {option}
               </span>
             </label>
@@ -409,7 +409,7 @@ const FileUploader = ({ files, onUpload, onRemove, onSubmit, status }: {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging (false);
+    setIsDragging(false);
     if (e.dataTransfer.files) onUpload(e.dataTransfer.files);
   };
 
