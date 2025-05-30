@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   UsersIcon, 
   BookOpenIcon,
@@ -40,134 +41,134 @@ interface Student {
   redFlags: string[];
 }
 
-const initialStudents: Student[] = [
-    {
-      id: 1,
-      name: 'John Doe',
-      academicId: 'CS101',
-      email: 'john.doe@university.edu',
-      phone: '+1 555-123-4567',
-      batch: '2023',
-      semester: 5,
-      gpa: 3.5,
-      backlogs: 0,
-      attendance: [
-        { date: '2023-10-01', status: 'Present' },
-        { date: '2023-10-02', status: 'Absent' },
-        { date: '2023-10-03', status: 'Present' },
-      ],
-      classAdvisor: 'Dr. Alice Johnson',
-      redFlags: [],
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      academicId: 'CS102',
-      email: 'jane.smith@university.edu',
-      phone: '+1 555-987-6543',
-      batch: '2022',
-      semester: 6,
-      gpa: 3.9,
-      backlogs: 0,
-      attendance: [
-        { date: '2023-10-01', status: 'Present' },
-        { date: '2023-10-02', status: 'Present' },
-        { date: '2023-10-03', status: 'Present' },
-      ],
-      classAdvisor: 'Dr. Robert Lee',
-      redFlags: [],
-    },
-    {
-      id: 3,
-      name: 'Emily Carter',
-      academicId: 'CS103',
-      email: 'emily.carter@university.edu',
-      phone: '+1 555-456-7890',
-      batch: '2024',
-      semester: 3,
-      gpa: 2.8,
-      backlogs: 2,
-      attendance: [
-        { date: '2023-10-01', status: 'Leave' },
-        { date: '2023-10-02', status: 'Present' },
-        { date: '2023-10-03', status: 'Absent' },
-      ],
-      classAdvisor: 'Dr. Alice Johnson',
-      redFlags: ['Low GPA', 'Multiple Backlogs'],
-    },
-    {
-      id: 4,
-      name: 'Michael Nguyen',
-      academicId: 'CS104',
-      email: 'michael.nguyen@university.edu',
-      phone: '+1 555-321-6789',
-      batch: '2021',
-      semester: 7,
-      gpa: 3.2,
-      backlogs: 1,
-      attendance: [
-        { date: '2023-10-01', status: 'Present' },
-        { date: '2023-10-02', status: 'Leave' },
-        { date: '2023-10-03', status: 'Present' },
-      ],
-      classAdvisor: 'Dr. Nisha Patel',
-      redFlags: ['Pending Backlog'],
-    },
-    {
-      id: 5,
-      name: 'Sara Ali',
-      academicId: 'CS105',
-      email: 'sara.ali@university.edu',
-      phone: '+1 555-222-3333',
-      batch: '2023',
-      semester: 5,
-      gpa: 4.0,
-      backlogs: 0,
-      attendance: [
-        { date: '2023-10-01', status: 'Present' },
-        { date: '2023-10-02', status: 'Present' },
-        { date: '2023-10-03', status: 'Present' },
-      ],
-      classAdvisor: 'Dr. Robert Lee',
-      redFlags: [],
-    },
-  ];
-  
-
 export function StudentManagement() {
   const { toast } = useToast();
-  const [studentList, setStudentList] = useState<Student[]>(initialStudents);
+  const [studentList, setStudentList] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('directory');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/students');
+      if (!response.ok) {
+        throw new Error('Failed to fetch students');
+      }
+      const data = await response.json();
+      setStudentList(data);
+    } catch (error) {
+      toast({ title: 'Failed to load students', variant: 'destructive' });
+      console.error(error);
+    }
+    setIsLoading(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      const newStudents = jsonData.map(item => ({
+        name: item['Name'] || '',
+        academicId: item['AcademicId'] || '',
+        email: item['Email'] || '',
+        phone: item['Phone'] || '',
+        batch: item['Batch'] || '',
+        semester: item['Semester'] || 0,
+        gpa: item['GPA'] || 0,
+        backlogs: item['Backlogs'] || 0,
+        attendance: [], // Could be extended to parse attendance if needed
+        classAdvisor: item['ClassAdvisor'] || '',
+        redFlags: item['RedFlags'] ? item['RedFlags'].split(',').map((r: string) => r.trim()) : [],
+      }));
+
+      const response = await fetch('/api/students/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudents),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload student data');
+      }
+
+      const createdStudents = await response.json();
+      setStudentList(prev => [...prev, ...createdStudents]);
+      toast({ title: 'Student data uploaded successfully', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Failed to upload student data', variant: 'destructive' });
+      console.error('Error uploading student data:', error);
+    }
+    setUploading(false);
+  };
 
   const filteredStudents = useMemo(() => {
+    if (!studentList) return [];
     return studentList.filter(student => 
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.academicId.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [studentList, searchQuery]);
 
-  const handleAddStudent = (newStudent: Omit<Student, 'id'>) => {
-    setStudentList(prev => [...prev, { ...newStudent, id: prev.length + 1 }]);
-    setIsEditModalOpen(false);
-    toast({ title: 'Student added successfully', variant: 'success' });
+  const handleAddStudent = async (newStudent: Omit<Student, 'id'>) => {
+    try {
+      const response = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudent),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add student');
+      }
+      const createdStudent = await response.json();
+      setStudentList(prev => [...prev, createdStudent]);
+      setIsEditModalOpen(false);
+      toast({ title: 'Student added successfully', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Failed to add student', variant: 'destructive' });
+      console.error(error);
+    }
   };
 
   const handleUpdateStudent = (updatedStudent: Student | Omit<Student, 'id'>) => {
     if ('id' in updatedStudent) {
-      setStudentList(prev => 
-        prev.map(s => s.id === updatedStudent.id ? updatedStudent as Student : s)
-      );
+      (async () => {
+        try {
+          const response = await fetch(`/api/students/${updatedStudent.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedStudent),
+          });
+          if (!response.ok) {
+            throw new Error('Failed to update student');
+          }
+          const data = await response.json();
+          setStudentList(prev => prev.map(s => s.id === data.id ? data : s));
+          setIsEditModalOpen(false);
+          toast({ title: 'Student updated successfully', variant: 'success' });
+        } catch (error) {
+          toast({ title: 'Failed to update student', variant: 'destructive' });
+          console.error(error);
+        }
+      })();
     } else {
       handleAddStudent(updatedStudent);
-      return;
     }
-    setIsEditModalOpen(false);
-    toast({ title: 'Student updated successfully', variant: 'success' });
   };
 
   return (
@@ -184,7 +185,7 @@ export function StudentManagement() {
           <input
             type="text"
             placeholder="Search students..."
-            className="pl- 10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-primary"
+            className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-primary"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -194,6 +195,13 @@ export function StudentManagement() {
             <PlusIcon className="w-4 h-4" />
             Add Student
           </Button>
+          <input
+            type="file"
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="ml-4 p-2 border border-gray-300 rounded-md cursor-pointer"
+          />
         </div>
       </div>
 
@@ -248,8 +256,8 @@ export function StudentManagement() {
                       <TableCell><Skeleton className="h-8 w-[100px] ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredStudents.length > 0 ? (
-                  filteredStudents.map((student) => (
+                ) : (filteredStudents ?? []).length > 0 ? (
+                  (filteredStudents ?? []).map((student) => (
                     <TableRow key={student.id} className="hover:bg-muted/50">
                       <TableCell>
                         <div className="font-medium">{student.name}</div>
@@ -297,14 +305,14 @@ export function StudentManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
+                {(filteredStudents ?? []).map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
                       <div className="font-medium">{student.name}</div>
                     </TableCell>
                     <TableCell>{student.gpa}</TableCell>
                     <TableCell>{student.backlogs}</TableCell>
-                    <TableCell>{ student.semester}</TableCell>
+                    <TableCell>{student.semester}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -324,19 +332,19 @@ export function StudentManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
-                  student.attendance.map((record, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>{format(new Date(record.date), 'MMMM dd, yyyy')}</TableCell>
-                      <TableCell>
-                        <Badge variant={record.status === 'Present' ? 'success' : 'destructive'}>
-                          {record.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ))}
+              {(filteredStudents ?? []).map((student) => (
+                (student.attendance ?? []).map((record, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{student.name}</TableCell>
+                    <TableCell>{format(new Date(record.date), 'MMMM dd, yyyy')}</TableCell>
+                    <TableCell>
+                      <Badge variant={record.status === 'Present' ? 'success' : 'destructive'}>
+                        {record.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ))}
               </TableBody>
             </Table>
           </Card>
@@ -354,19 +362,19 @@ export function StudentManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
+                {(filteredStudents ?? []).map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
                       <div className="font-medium">{student.name}</div>
                     </TableCell>
                     <TableCell>
-                      {student.redFlags.length > 0 ? (
-                        student.redFlags.map((flag, index) => (
-                          <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
-                        ))
-                      ) : (
-                        <span>No red flags</span>
-                      )}
+              {(student.redFlags ?? []).length > 0 ? (
+                (student.redFlags ?? []).map((flag, index) => (
+                  <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
+                ))
+              ) : (
+                <span>No red flags</span>
+              )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -387,7 +395,7 @@ export function StudentManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
+                {(filteredStudents ?? []).map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
                       <div className="font-medium">{student.name}</div>
@@ -435,13 +443,13 @@ export function StudentManagement() {
                   <h4 className="font-medium text-gray-900 mb-2">Attendance Records</h4>
                   <Table>
                     <TableHeader>
-                      < TableRow>
+                      <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedStudent.attendance.map((record, index) => (
+                      {(selectedStudent.attendance ?? []).map((record, index) => (
                         <TableRow key={index}>
                           <TableCell>{format(new Date(record.date), 'MMMM dd, yyyy')}</TableCell>
                           <TableCell>
@@ -458,13 +466,13 @@ export function StudentManagement() {
 
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Red Flags</h4>
-                {selectedStudent.redFlags.length > 0 ? (
-                  selectedStudent.redFlags.map((flag, index) => (
-                    <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
-                  ))
-                ) : (
-                  <span>No red flags</span>
-                )}
+              {(selectedStudent.redFlags ?? []).length > 0 ? (
+                (selectedStudent.redFlags ?? []).map((flag, index) => (
+                  <Badge key={index} variant="warning" className="mr-1">{flag}</Badge>
+                ))
+              ) : (
+                <span>No red flags</span>
+              )}
               </div>
             </div>
           </Card>
