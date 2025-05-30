@@ -11,10 +11,10 @@ export const Tabs = ({ value, onValueChange, children }: TabsProps) => {
     <div className="flex flex-col">
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          if (child.type === TabsList) {
-            return React.cloneElement(child, { value, onValueChange });
+          if ((child.type as any).displayName === 'TabsList') {
+            return React.cloneElement(child, { value, onValueChange } as any);
           }
-          if (child.type === TabsContent) {
+          if ((child.type as any).displayName === 'TabsContent') {
             return child.props.value === value ? child : null;
           }
         }
@@ -34,17 +34,18 @@ export const TabsList = ({ children, value, onValueChange }: TabsListProps) => {
   return (
     <div className="flex border-b border-gray-200">
       {React.Children.map(children, (child) => {
-        if (React.isValidElement(child) && child.type === TabsTrigger) {
+        if (React.isValidElement(child) && (child.type as any).displayName === 'TabsTrigger') {
           return React.cloneElement(child, { 
             active: value === child.props.value,
             onValueChange 
-          });
+          } as any);
         }
         return child;
       })}
     </div>
   );
 };
+TabsList.displayName = 'TabsList';
 
 interface TabsTriggerProps {
   value: string;
@@ -72,6 +73,7 @@ export const TabsTrigger = ({
     </button>
   );
 };
+TabsTrigger.displayName = 'TabsTrigger';
 
 interface TabsContentProps {
   value: string;
@@ -85,3 +87,4 @@ export const TabsContent = ({ value, children }: TabsContentProps) => {
     </div>
   );
 };
+TabsContent.displayName = 'TabsContent';
