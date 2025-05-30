@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   UsersIcon, 
   BookOpenIcon,
@@ -225,7 +226,6 @@ const initialFaculty: Faculty[] = [
   }
 ];
 
-
 export function FacultyManagement() {
   const { toast } = useToast();
   const [facultyList, setFacultyList] = useState<Faculty[]>(initialFaculty);
@@ -236,6 +236,59 @@ export function FacultyManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [isLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      const newFaculty: Faculty[] = [];
+
+      for (const item of jsonData) {
+        const faculty: Faculty = {
+          id: facultyList.length + newFaculty.length + 1,
+          name: item['Name'] || '',
+          designation: item['Designation'] || '',
+          department: item['Department'] || '',
+          email: item['Email'] || '',
+          phone: item['Phone'] || '',
+          qualifications: item['Qualifications'] ? item['Qualifications'].split(',').map((q: string) => q.trim()) : [],
+          joiningDate: item['JoiningDate'] || '',
+          experience: item['Experience'] || '',
+          courses: item['Courses'] ? item['Courses'].split(',').map((c: string) => c.trim()) : [],
+          roles: item['Roles'] ? item['Roles'].split(',').map((r: string) => r.trim()) : [],
+          officeHours: item['OfficeHours'] ? item['OfficeHours'].split(',').map((o: string) => o.trim()) : [],
+          researchAreas: item['ResearchAreas'] ? item['ResearchAreas'].split(',').map((r: string) => r.trim()) : [],
+          profileImage: item['ProfileImage'] || '',
+          attendance: [], // Could be extended to parse attendance if needed
+          performance: {
+            studentFeedback: 0,
+            peerReview: 0,
+            hodEvaluation: 0,
+            researchScore: 0,
+            publications: []
+          }
+        };
+        newFaculty.push(faculty);
+      }
+
+      // Here you would typically send newFaculty to backend API to save
+      // For now, we just update the state
+      setFacultyList(prev => [...prev, ...newFaculty]);
+      toast({ title: 'Faculty data uploaded successfully', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Failed to upload faculty data', variant: 'destructive' });
+      console.error('Error uploading faculty data:', error);
+    }
+    setUploading(false);
+  };
 
   const filteredFaculty = useMemo(() => {
     return facultyList.filter(faculty => {
@@ -334,6 +387,13 @@ export function FacultyManagement() {
             <PlusIcon className="w-4 h-4" />
             Add Faculty
           </Button>
+          <input
+            type="file"
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="ml-4 p-2 border border-gray-300 rounded-md cursor-pointer"
+          />
         </div>
       </div>
 
