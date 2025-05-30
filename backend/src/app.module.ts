@@ -8,11 +8,11 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { CoursesModule } from './courses/courses.module';
-import { StudentsModule } from './students/students.module';
+import { StudentsModule } from './students/student.module';
 import { FacultyModule } from './faculty/faculty.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { AssignmentsModule } from './assignments/assignments.module';
-import { AnnouncementsModule } from './announcements/announcements.module';
+import { AnnouncementsModule } from './announcement/announcement.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { EventsModule } from './events/events.module';
 
