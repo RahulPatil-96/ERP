@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
 import { Edit, Trash, Plus, Search, FileText, BookOpen, List, CheckSquare, Upload } from 'lucide-react';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Select } from '../../components/common/Select';
@@ -134,7 +134,7 @@ const initialAssignments: FacultyAssignment[] = [
     type: 'essay',
     dueDate: '2024-06-05T23:59',
     status: 'draft',
-    instructions: 'Write a 1000-word analysis and review a peer’s essay',
+    instructions: 'Write a 1000-word analysis and review a peer's essay',
     points: 90,
     wordLimit: 1000,
     attachments: [],

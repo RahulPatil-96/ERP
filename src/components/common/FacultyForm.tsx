@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { Input } from '../../components/common/Input';
 import { Badge } from '../../components/common/Badge';
 import { XIcon, PlusIcon } from 'lucide-react';
