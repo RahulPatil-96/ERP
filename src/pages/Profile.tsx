@@ -225,7 +225,7 @@ export function ProfilePage() {
   const { user } = useAuthStore();
   const [selectedTab, setSelectedTab] = useState('Overview');
   const [loading, setLoading] = useState(true);
-  const currentData = profileData[(user?.role as Role) || 'student'];
+const currentData = profileData[(user?.currentRole as Role) || 'student'];
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 800);
@@ -396,7 +396,7 @@ export function ProfilePage() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 {user?.firstName} {user?.lastName}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 capitalize">{user?.role}</p>
+<p className="text-gray-600 dark:text-gray-400 capitalize">{user?.currentRole}</p>
             </div>
           </div>
         </div>
