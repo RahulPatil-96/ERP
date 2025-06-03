@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
+import { Button } from '../../components/common/button';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import StudentForm from '../../components/common/StudentForm';
